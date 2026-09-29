@@ -1,15 +1,12 @@
 /**
- * page.tsx — Home page (placeholder).
- * Just renders a blank light page to prove the dev server works.
- * Real content will be added in later phases.
+ * page.tsx — Root page that redirects to /dashboard.
+ *
+ * The Header component on the dashboard will handle the auth check:
+ * if the user is not authenticated, it redirects to /login.
  */
 
+import { redirect } from "next/navigation";
+
 export default function HomePage() {
-  return (
-    <main className="flex flex-1 items-center justify-center">
-      <p className="text-color-text-secondary text-sm">
-        Tiffin Scheduler — ready
-      </p>
-    </main>
-  );
+  redirect("/dashboard");
 }

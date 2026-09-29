@@ -8,6 +8,7 @@ import express from "express";
 import cors from "cors";
 import helmet from "helmet";
 import cookieParser from "cookie-parser";
+import passport from "./config/passport";
 import { env } from "./config/env";
 import routes from "./routes";
 import { errorHandler } from "./middleware/errorHandler";
@@ -24,6 +25,7 @@ app.use(
 );
 app.use(express.json());
 app.use(cookieParser());
+app.use(passport.initialize());
 
 // ── Routes ───────────────────────────────────────────────
 app.use(routes);

@@ -19,4 +19,4 @@ export const ES_INDICES = {
 } as const;
 
 /** Cookie name for the JWT auth token */
-export const AUTH_COOKIE_NAME = "tiffin_token";
+export const AUTH_COOKIE_NAME = "tiffin_session";
