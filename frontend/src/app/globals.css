@@ -1,0 +1,35 @@
+/**
+ * globals.css — Global styles and Tailwind CSS theme tokens.
+ * Defines the color system as CSS variables so they can be referenced
+ * both in Tailwind utilities and in plain CSS.
+ *
+ * Light theme only — no dark mode media query.
+ */
+@import "tailwindcss";
+
+:root {
+  --color-bg: #fafafa;
+  --color-surface: #ffffff;
+  --color-border: #e5e7eb;
+  --color-text: #1a1a1a;
+  --color-text-secondary: #6b7280;
+  --color-accent: #d97706;
+}
+
+@theme inline {
+  --color-bg: var(--color-bg);
+  --color-surface: var(--color-surface);
+  --color-border: var(--color-border);
+  --color-text: var(--color-text);
+  --color-text-secondary: var(--color-text-secondary);
+  --color-accent: var(--color-accent);
+  --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system,
+    BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial,
+    sans-serif;
+}
+
+body {
+  background-color: var(--color-bg);
+  color: var(--color-text);
+  font-family: var(--font-sans);
+}
