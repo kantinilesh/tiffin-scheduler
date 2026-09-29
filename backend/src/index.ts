@@ -1,6 +1,7 @@
 /**
  * index.ts — Entry point for the Express API server.
- * Sets up middleware, mounts routes, and starts listening.
+ * Sets up middleware, mounts routes, reconciles any pending emails
+ * into the BullMQ queue, and starts listening.
  * This file does NOT contain any business logic.
  */
 
@@ -12,6 +13,7 @@ import passport from "./config/passport";
 import { env } from "./config/env";
 import routes from "./routes";
 import { errorHandler } from "./middleware/errorHandler";
+import { reconcileScheduledEmails } from "./services/reconcile";
 
 const app = express();
 
@@ -33,11 +35,15 @@ app.use(routes);
 // ── Error handling (must be last) ────────────────────────
 app.use(errorHandler);
 
-// ── Start ────────────────────────────────────────────────
-app.listen(env.PORT, () => {
-  console.log(
-    `[tiffin-backend] Server running on http://localhost:${env.PORT}`
-  );
-});
+// ── Reconcile + Start ────────────────────────────────────
+(async () => {
+  await reconcileScheduledEmails();
+
+  app.listen(env.PORT, () => {
+    console.log(
+      `[tiffin-backend] Server running on http://localhost:${env.PORT}`
+    );
+  });
+})();
 
 export default app;
