@@ -1,0 +1,98 @@
+// schema.prisma — Database schema for Tiffin Scheduler.
+//
+// Models:
+//   User              — Google-OAuth'd user who owns campaigns
+//   Sender            — Ethereal SMTP credentials the user registers
+//   Campaign          — A batch of emails with scheduling + rate-limit params
+//   Email             — One outgoing message, tracked through its lifecycle
+//   SlackIntegration  — Optional Slack workspace connection per user
+//
+// The @@unique([campaignId, recipient]) on Email prevents duplicate sends
+// even if a job is retried or replayed.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(uuid())
+  googleId  String   @unique
+  name      String
+  email     String   @unique
+  avatarUrl String?
+  createdAt DateTime @default(now())
+
+  senders   Sender[]
+  campaigns Campaign[]
+  slack     SlackIntegration?
+}
+
+model Sender {
+  id           String @id @default(uuid())
+  userId       String
+  user         User   @relation(fields: [userId], references: [id])
+  label        String   // e.g. "Sender A"
+  etherealUser String
+  etherealPass String
+  smtpHost     String @default("smtp.ethereal.email")
+  smtpPort     Int    @default(587)
+
+  emails Email[]
+}
+
+model Campaign {
+  id           String   @id @default(uuid())
+  userId       String
+  user         User     @relation(fields: [userId], references: [id])
+  subject      String
+  body         String
+  startTime    DateTime
+  delaySeconds Int
+  hourlyLimit  Int
+  createdAt    DateTime @default(now())
+
+  emails Email[]
+}
+
+model Email {
+  id          String      @id @default(uuid())
+  campaignId  String
+  campaign    Campaign    @relation(fields: [campaignId], references: [id])
+  senderId    String
+  sender      Sender      @relation(fields: [senderId], references: [id])
+  recipient   String
+  subject     String
+  body        String
+  scheduledAt DateTime
+  sentAt      DateTime?
+  status      EmailStatus @default(scheduled)
+  attempts    Int         @default(0)
+  failReason  String?
+
+  @@unique([campaignId, recipient]) // idempotency guard at the DB level
+  @@index([status])
+  @@index([scheduledAt])
+}
+
+enum EmailStatus {
+  scheduled
+  processing
+  sent
+  failed
+}
+
+model SlackIntegration {
+  id          String   @id @default(uuid())
+  userId      String   @unique
+  user        User     @relation(fields: [userId], references: [id])
+  teamId      String
+  accessToken String?
+  webhookUrl  String?
+  channelId   String?
+  createdAt   DateTime @default(now())
+}
