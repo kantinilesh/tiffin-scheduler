@@ -38,7 +38,7 @@ export async function scheduleEmails(
     return;
   }
 
-  if (!startTime || !delaySeconds || !hourlyLimit) {
+  if (!startTime || delaySeconds === undefined || delaySeconds === null || !hourlyLimit) {
     res
       .status(400)
       .json({ error: "startTime, delaySeconds, and hourlyLimit are required" });

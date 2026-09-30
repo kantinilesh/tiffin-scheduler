@@ -10,25 +10,29 @@
  * Flow for each job:
  *   1. Claim: UPDATE Email SET status='processing' WHERE id=X AND status='scheduled'
  *      - If count=0, another worker already handled it → skip.
- *   2. Load the full Email + Sender from the database.
- *   3. Send via Nodemailer using the sender's Ethereal credentials.
- *   4. Update status to 'sent' (with sentAt) or 'failed' (with failReason).
+ *   2. Load the full Email + Sender + Campaign from the database.
+ *   3. Rate limit check: Atomic Redis Lua script checks per-sender hourly limit.
+ *      - If cap reached: revert DB status to 'scheduled', reschedule into the
+ *        next hour boundary using job.moveToDelayed(next, token), and throw DelayedError.
+ *   4. Send via Nodemailer using the sender's Ethereal credentials.
+ *   5. Update status to 'sent' (with sentAt) or 'failed' (with failReason).
  */
 
-import { Worker, Job } from "bullmq";
+import { Worker, Job, DelayedError } from "bullmq";
 import { connection } from "../config/redis";
 import { QUEUE_NAMES } from "../config/constants";
-import { env } from "../config/env";
 import { prisma } from "../db/prisma";
 import { sendMail } from "../services/mailer";
+import { tryConsumeHourlySlot, nextHourBoundary } from "../services/rateLimiter";
 
-interface EmailJobData {
+export interface EmailJobData {
   emailId: string;
+  sequenceIndex?: number;
 }
 
 const worker = new Worker<EmailJobData>(
   QUEUE_NAMES.EMAIL,
-  async (job: Job<EmailJobData>) => {
+  async (job: Job<EmailJobData>, token?: string) => {
     const { emailId } = job.data;
 
     // Step 1: Claim — atomic compare-and-swap
@@ -44,13 +48,33 @@ const worker = new Worker<EmailJobData>(
       return;
     }
 
-    // Step 2: Load full email + sender
+    // Step 2: Load full email + sender + campaign
     const email = await prisma.email.findUniqueOrThrow({
       where: { id: emailId },
-      include: { sender: true },
+      include: { sender: true, campaign: true },
     });
 
-    // Step 3 + 4: Send and update status
+    // Step 3: Hourly rate limit check (per-sender atomic Lua script)
+    const allowed = await tryConsumeHourlySlot(
+      email.senderId,
+      email.campaign.hourlyLimit
+    );
+    if (!allowed) {
+      console.log(
+        `[worker] ⏸ Rate limit hit for sender ${email.senderId} (hourly cap: ${email.campaign.hourlyLimit}). Rescheduling email ${emailId} to next hour.`
+      );
+      // Give the row back to 'scheduled' so it isn't stuck as 'processing'
+      await prisma.email.update({
+        where: { id: emailId },
+        data: { status: "scheduled" },
+      });
+      const next = nextHourBoundary();
+      next.setSeconds(next.getSeconds() + (job.data.sequenceIndex ?? 0) * 5); // preserve rough order
+      await job.moveToDelayed(next.getTime(), token);
+      throw new DelayedError(); // tells BullMQ "this job isn't done, don't mark it failed"
+    }
+
+    // Step 4 + 5: Send and update status
     try {
       await sendMail(email.sender, email.recipient, email.subject, email.body);
 
@@ -81,7 +105,11 @@ const worker = new Worker<EmailJobData>(
   },
   {
     connection,
-    concurrency: env.QUEUE_CONCURRENCY, // from env, never hardcoded
+    concurrency: Number(process.env.WORKER_CONCURRENCY),
+    limiter: {
+      max: 1,
+      duration: Number(process.env.MIN_DELAY_MS),
+    },
   }
 );
 

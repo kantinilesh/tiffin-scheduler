@@ -48,7 +48,10 @@ export const env = {
   SMTP_USER: process.env.SMTP_USER || "",
   SMTP_PASS: process.env.SMTP_PASS || "",
 
-  // BullMQ limits — always from env, never hardcoded
+  // BullMQ limits & rate limiting — always from env, never hardcoded
+  WORKER_CONCURRENCY: parseInt(process.env.WORKER_CONCURRENCY || "5", 10),
+  MIN_DELAY_MS: parseInt(process.env.MIN_DELAY_MS || "2000", 10),
+  MAX_EMAILS_PER_HOUR: parseInt(process.env.MAX_EMAILS_PER_HOUR || "200", 10),
   QUEUE_CONCURRENCY: parseInt(process.env.QUEUE_CONCURRENCY || "5", 10),
   QUEUE_RATE_LIMIT_MAX: parseInt(
     process.env.QUEUE_RATE_LIMIT_MAX || "100",

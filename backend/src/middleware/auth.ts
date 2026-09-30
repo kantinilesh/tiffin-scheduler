@@ -8,7 +8,7 @@
  */
 
 import { Request, Response, NextFunction } from "express";
-import jwt from "jsonwebtoken";
+import jwt, { SignOptions } from "jsonwebtoken";
 import { env } from "../config/env";
 import { AUTH_COOKIE_NAME } from "../config/constants";
 
@@ -23,7 +23,7 @@ interface JwtPayload {
  */
 export function issueJwt(user: { id: string }): string {
   return jwt.sign({ sub: user.id }, env.JWT_SECRET, {
-    expiresIn: env.JWT_EXPIRES_IN,
+    expiresIn: env.JWT_EXPIRES_IN as SignOptions["expiresIn"],
   });
 }
 

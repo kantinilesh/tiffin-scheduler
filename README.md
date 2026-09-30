@@ -60,3 +60,9 @@ tiffin-scheduler/
         ├── lib/              # Shared utilities, API client
         └── types/            # Shared TypeScript types
 ```
+
+## Rate Limiting & Throughput Controls
+
+- **Queue-Wide Throughput Cap**: We enforce a minimum 2-second gap between sends queue-wide via BullMQ's limiter option (max: 1 job per MIN_DELAY_MS).
+- **Per-Sender Hourly Limit**: Evaluated atomically in Redis using a Lua script (`tryConsumeHourlySlot`). If a sender reaches their hourly cap, pending emails are reverted to `scheduled` and rescheduled to the next hour boundary via `moveToDelayed` with sequence offsets to preserve order.
+- **Worker Concurrency**: Controlled by `WORKER_CONCURRENCY` env variable (never hardcoded).

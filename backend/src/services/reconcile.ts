@@ -44,7 +44,7 @@ export async function reconcileScheduledEmails(): Promise<void> {
   for (const email of pending) {
     await emailQueue.add(
       "send-email",
-      { emailId: email.id },
+      { emailId: email.id, sequenceIndex: 0 },
       {
         jobId: `email-${email.id}`,
         delay: Math.max(0, email.scheduledAt.getTime() - Date.now()),

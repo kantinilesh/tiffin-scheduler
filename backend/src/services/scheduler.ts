@@ -10,6 +10,15 @@
  *
  * The deterministic jobId means re-adding the same email is a no-op in
  * BullMQ — this is the restart-safety mechanism.
+ *
+ * Behavior under load:
+ * If 1000+ emails are scheduled for the same start time, all 1000 become
+ * BullMQ delayed jobs immediately (cheap — Redis handles large sorted sets
+ * fine). The queue-wide limiter throttles how fast they start (1 per
+ * MIN_DELAY_MS), and the per-sender hourly Lua-script counter caps how many
+ * actually send per hour per sender. Anything over the cap is rescheduled
+ * into the next hour window via moveToDelayed — never dropped, never
+ * permanently failed.
  */
 
 import { prisma } from "../db/prisma";
@@ -83,12 +92,13 @@ export async function scheduleCampaign(input: ScheduleInput) {
   // Step 3: Enqueue each email as a delayed BullMQ job
   // This happens AFTER the transaction commits so we never enqueue
   // emails that don't exist in the database.
-  for (const email of emails) {
+  for (let i = 0; i < emails.length; i++) {
+    const email = emails[i];
     const delay = Math.max(0, email.scheduledAt.getTime() - Date.now());
 
     await emailQueue.add(
       "send-email",
-      { emailId: email.id },
+      { emailId: email.id, sequenceIndex: i },
       {
         jobId: `email-${email.id}`, // deterministic = idempotency key
         delay,
