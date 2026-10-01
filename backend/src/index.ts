@@ -14,6 +14,7 @@ import { env } from "./config/env";
 import routes from "./routes";
 import { errorHandler } from "./middleware/errorHandler";
 import { reconcileScheduledEmails } from "./services/reconcile";
+import { ensureSearchIndex } from "./services/search";
 
 const app = express();
 
@@ -35,8 +36,9 @@ app.use(routes);
 // ── Error handling (must be last) ────────────────────────
 app.use(errorHandler);
 
-// ── Reconcile + Start ────────────────────────────────────
+// ── Search Index + Reconcile + Start ─────────────────────
 (async () => {
+  await ensureSearchIndex();
   await reconcileScheduledEmails();
 
   app.listen(env.PORT, () => {

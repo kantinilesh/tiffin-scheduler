@@ -23,6 +23,7 @@
 
 import { prisma } from "../db/prisma";
 import { emailQueue } from "../queues/emailQueue";
+import { indexEmail } from "./search";
 
 interface ScheduleInput {
   userId: string;
@@ -88,6 +89,11 @@ export async function scheduleCampaign(input: ScheduleInput) {
       });
     })
   );
+
+  // Index newly created emails into Elasticsearch
+  for (const email of emails) {
+    await indexEmail(email);
+  }
 
   // Step 3: Enqueue each email as a delayed BullMQ job
   // This happens AFTER the transaction commits so we never enqueue

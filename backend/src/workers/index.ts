@@ -9,11 +9,13 @@
 
 import { env } from "../config/env";
 import { reconcileScheduledEmails } from "../services/reconcile";
+import { ensureSearchIndex } from "../services/search";
 
 // Import workers — each one self-registers on import
 import "./emailWorker";
 
 (async () => {
+  await ensureSearchIndex();
   await reconcileScheduledEmails();
 
   console.log(

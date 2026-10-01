@@ -24,6 +24,7 @@ import { QUEUE_NAMES } from "../config/constants";
 import { prisma } from "../db/prisma";
 import { sendMail } from "../services/mailer";
 import { tryConsumeHourlySlot, nextHourBoundary } from "../services/rateLimiter";
+import { indexEmail } from "../services/search";
 
 export interface EmailJobData {
   emailId: string;
@@ -54,6 +55,9 @@ const worker = new Worker<EmailJobData>(
       include: { sender: true, campaign: true },
     });
 
+    // Mirror 'processing' status to Elasticsearch
+    await indexEmail(email);
+
     // Step 3: Hourly rate limit check (per-sender atomic Lua script)
     const allowed = await tryConsumeHourlySlot(
       email.senderId,
@@ -68,6 +72,7 @@ const worker = new Worker<EmailJobData>(
         where: { id: emailId },
         data: { status: "scheduled" },
       });
+      await indexEmail({ ...email, status: "scheduled" });
       const next = nextHourBoundary();
       next.setSeconds(next.getSeconds() + (job.data.sequenceIndex ?? 0) * 5); // preserve rough order
       await job.moveToDelayed(next.getTime(), token);
@@ -78,7 +83,7 @@ const worker = new Worker<EmailJobData>(
     try {
       await sendMail(email.sender, email.recipient, email.subject, email.body);
 
-      await prisma.email.update({
+      const sentEmail = await prisma.email.update({
         where: { id: emailId },
         data: {
           status: "sent",
@@ -87,9 +92,11 @@ const worker = new Worker<EmailJobData>(
         },
       });
 
+      await indexEmail(sentEmail);
+
       console.log(`[worker] ✅ Sent email ${emailId} to ${email.recipient}`);
     } catch (err) {
-      await prisma.email.update({
+      const failedEmail = await prisma.email.update({
         where: { id: emailId },
         data: {
           status: "failed",
@@ -97,6 +104,8 @@ const worker = new Worker<EmailJobData>(
           attempts: { increment: 1 },
         },
       });
+
+      await indexEmail(failedEmail);
 
       console.error(
         `[worker] ❌ Failed email ${emailId}: ${String(err)}`
