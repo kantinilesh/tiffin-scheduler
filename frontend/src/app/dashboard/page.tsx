@@ -1,11 +1,11 @@
 /**
- * dashboard/page.tsx — Email campaigns dashboard shell.
+ * dashboard/page.tsx — Email campaigns dashboard.
  *
- * Features:
- *   - Tab switcher: "Scheduled Emails" | "Sent Emails" with amber active underline.
- *   - "Compose New Email" amber primary action button in the top right.
- *   - Render <EmptyState message="No scheduled emails yet" /> (or "No sent emails yet").
- *   - Includes demo modal for "Compose New Email" to test the UI Modal component.
+ * Integrates:
+ *   - Tabs for switching between "Scheduled Emails" and "Sent Emails".
+ *   - "Compose New Email" amber action button opening ComposeModal.
+ *   - ScheduledEmailsTable and SentEmailsTable with live data hooks.
+ *   - Automatic refresh of scheduled emails upon new campaign creation.
  */
 
 "use client";
@@ -13,26 +13,47 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/Button";
 import { Tabs } from "@/components/ui/Tabs";
-import { EmptyState } from "@/components/ui/EmptyState";
-import { Modal } from "@/components/ui/Modal";
-import { useToast } from "@/components/ui/Toast";
+import { ComposeModal } from "@/features/compose/ComposeModal";
+import { ScheduledEmailsTable } from "@/features/emails/ScheduledEmailsTable";
+import { SentEmailsTable } from "@/features/emails/SentEmailsTable";
+import { useScheduledEmails } from "@/features/emails/useScheduledEmails";
+import { useSentEmails } from "@/features/emails/useSentEmails";
 
 export default function DashboardPage() {
   const [activeTab, setActiveTab] = useState<string>("scheduled");
   const [isComposeOpen, setIsComposeOpen] = useState(false);
-  const { showToast } = useToast();
+
+  const {
+    data: scheduledEmails,
+    isLoading: isScheduledLoading,
+    error: scheduledError,
+    refetch: refetchScheduled,
+  } = useScheduledEmails();
+
+  const {
+    data: sentEmails,
+    isLoading: isSentLoading,
+    error: sentError,
+    refetch: refetchSent,
+  } = useSentEmails();
 
   const tabs = [
-    { id: "scheduled", label: "Scheduled Emails", count: 0 },
-    { id: "sent", label: "Sent Emails", count: 0 },
+    {
+      id: "scheduled",
+      label: "Scheduled Emails",
+      count: scheduledEmails.length,
+    },
+    {
+      id: "sent",
+      label: "Sent Emails",
+      count: sentEmails.length,
+    },
   ];
 
-  function handleComposeClick() {
-    setIsComposeOpen(true);
-  }
-
-  function handleCloseCompose() {
-    setIsComposeOpen(false);
+  function handleComposeSuccess() {
+    setActiveTab("scheduled");
+    refetchScheduled();
+    refetchSent();
   }
 
   return (
@@ -49,7 +70,7 @@ export default function DashboardPage() {
         <div className="shrink-0 pb-1">
           <Button
             variant="primary"
-            onClick={handleComposeClick}
+            onClick={() => setIsComposeOpen(true)}
             leftIcon={
               <svg
                 className="h-4 w-4"
@@ -74,57 +95,27 @@ export default function DashboardPage() {
       {/* Main Content Area */}
       <div className="mt-8">
         {activeTab === "scheduled" ? (
-          <EmptyState
-            message="No scheduled emails yet"
-            description="Campaign emails scheduled for future delivery will appear here."
-            action={
-              <Button variant="secondary" size="sm" onClick={handleComposeClick}>
-                Schedule your first email
-              </Button>
-            }
+          <ScheduledEmailsTable
+            emails={scheduledEmails}
+            isLoading={isScheduledLoading}
+            error={scheduledError}
+            onComposeClick={() => setIsComposeOpen(true)}
           />
         ) : (
-          <EmptyState
-            message="No sent emails yet"
-            description="Emails that have been successfully delivered by workers will be logged here."
+          <SentEmailsTable
+            emails={sentEmails}
+            isLoading={isSentLoading}
+            error={sentError}
           />
         )}
       </div>
 
-      {/* Compose Email Modal Shell */}
-      <Modal
+      {/* Compose Campaign Modal */}
+      <ComposeModal
         isOpen={isComposeOpen}
-        onClose={handleCloseCompose}
-        title="Compose New Email"
-        description="Schedule a new email campaign across your configured senders."
-        footer={
-          <>
-            <Button variant="outline" size="sm" onClick={handleCloseCompose}>
-              Cancel
-            </Button>
-            <Button
-              variant="primary"
-              size="sm"
-              onClick={() => {
-                showToast({
-                  type: "info",
-                  message: "Campaign creation form will be wired in the next phase.",
-                });
-                handleCloseCompose();
-              }}
-            >
-              Continue
-            </Button>
-          </>
-        }
-      >
-        <div className="space-y-4">
-          <p className="text-xs text-[#6b7280]">
-            The full campaign compose form (subject, body, CSV recipient upload,
-            start time, and delay interval) will be integrated in the next step.
-          </p>
-        </div>
-      </Modal>
+        onClose={() => setIsComposeOpen(false)}
+        onSuccess={handleComposeSuccess}
+      />
     </div>
   );
 }
