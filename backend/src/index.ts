@@ -15,11 +15,20 @@ import routes from "./routes";
 import { errorHandler } from "./middleware/errorHandler";
 import { reconcileScheduledEmails } from "./services/reconcile";
 import { ensureSearchIndex } from "./services/search";
+import { createBullBoard } from "@bull-board/api";
+import { BullMQAdapter } from "@bull-board/api/bullMQAdapter";
+import { ExpressAdapter } from "@bull-board/express";
+import { emailQueue } from "./queues/emailQueue";
+import { requireAuth } from "./middleware/auth";
 
 const app = express();
 
 // ── Security & parsing ───────────────────────────────────
-app.use(helmet());
+app.use(
+  helmet({
+    contentSecurityPolicy: false,
+  })
+);
 app.use(
   cors({
     origin: env.FRONTEND_URL,
@@ -29,6 +38,15 @@ app.use(
 app.use(express.json());
 app.use(cookieParser());
 app.use(passport.initialize());
+
+// ── Bull Board UI (Admin) ────────────────────────────────
+const serverAdapter = new ExpressAdapter();
+serverAdapter.setBasePath("/admin/queues");
+createBullBoard({
+  queues: [new BullMQAdapter(emailQueue)],
+  serverAdapter,
+});
+app.use("/admin/queues", requireAuth, serverAdapter.getRouter());
 
 // ── Routes ───────────────────────────────────────────────
 app.use(routes);
