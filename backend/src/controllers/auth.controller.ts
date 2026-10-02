@@ -79,3 +79,25 @@ export function onGoogleCallback(req: Request, res: Response): void {
   res.cookie(AUTH_COOKIE_NAME, token, setCookieOptions());
   res.redirect(`${env.FRONTEND_URL}/dashboard`);
 }
+
+/**
+ * GET /auth/dev — Development bypass for instant local testing & demos.
+ * Finds or creates the seeded dev user, sets the auth cookie, and redirects to dashboard.
+ */
+export async function devLogin(_req: Request, res: Response): Promise<void> {
+  let user = await prisma.user.findFirst();
+
+  if (!user) {
+    user = await prisma.user.create({
+      data: {
+        googleId: "google-fake-id-001",
+        name: "Tiffin Dev",
+        email: "dev@tiffin.test",
+      },
+    });
+  }
+
+  const token = issueJwt(user);
+  res.cookie(AUTH_COOKIE_NAME, token, setCookieOptions());
+  res.redirect(`${env.FRONTEND_URL}/dashboard`);
+}

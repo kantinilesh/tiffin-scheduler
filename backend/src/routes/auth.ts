@@ -15,9 +15,13 @@ import {
   getMe,
   logout,
   onGoogleCallback,
+  devLogin,
 } from "../controllers/auth.controller";
 
 const router = Router();
+
+// Development instant login (bypasses Google OAuth for local testing/demos)
+router.get("/auth/dev", devLogin);
 
 // Redirect to Google consent screen
 router.get(

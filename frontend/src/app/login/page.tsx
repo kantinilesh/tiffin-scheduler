@@ -59,6 +59,23 @@ export default function LoginPage() {
           </svg>
           Sign in with Google
         </Link>
+
+        {/* Divider */}
+        <div className="my-5 flex items-center gap-3">
+          <div className="h-px flex-1 bg-border" />
+          <span className="text-xs uppercase tracking-wider text-text-secondary">
+            or
+          </span>
+          <div className="h-px flex-1 bg-border" />
+        </div>
+
+        {/* Dev instant sign in button */}
+        <Link
+          href={`${BACKEND_URL}/auth/dev`}
+          className="flex w-full items-center justify-center gap-2 rounded-md border border-border bg-white px-4 py-2.5 text-xs font-medium text-text shadow-xs transition-colors hover:bg-gray-50"
+        >
+          <span>Continue as Dev User (Demo / Instant)</span>
+        </Link>
       </div>
     </main>
   );
