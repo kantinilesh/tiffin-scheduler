@@ -21,6 +21,7 @@
  * permanently failed.
  */
 
+import nodemailer from "nodemailer";
 import { prisma } from "../db/prisma";
 import { emailQueue } from "../queues/emailQueue";
 import { indexEmail } from "./search";
@@ -47,15 +48,25 @@ export async function scheduleCampaign(input: ScheduleInput) {
   } = input;
 
   // Fetch the user's senders for round-robin assignment
-  const senders = await prisma.sender.findMany({
+  let senders = await prisma.sender.findMany({
     where: { userId },
     orderBy: { label: "asc" },
   });
 
   if (senders.length === 0) {
-    throw Object.assign(new Error("No senders configured for this user"), {
-      statusCode: 400,
+    // Auto-provision an Ethereal SMTP test account for this user
+    const testAccount = await nodemailer.createTestAccount();
+    const autoSender = await prisma.sender.create({
+      data: {
+        userId,
+        label: "Sender A",
+        etherealUser: testAccount.user,
+        etherealPass: testAccount.pass,
+        smtpHost: testAccount.smtp.host,
+        smtpPort: testAccount.smtp.port,
+      },
     });
+    senders = [autoSender];
   }
 
   // Step 1 + 2: Create Campaign + Email rows in a single transaction
